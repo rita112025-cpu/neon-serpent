@@ -6,4 +6,7 @@ build/
 start-debug.log
 test-hello.bat
 start-debug.bat
+push-to-rita.bat
+push-github.bat
+start.ps1
 
