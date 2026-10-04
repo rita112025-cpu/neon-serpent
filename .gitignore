@@ -3,3 +3,7 @@ node_modules/
 dist/
 build/
 *.log
+start-debug.log
+test-hello.bat
+start-debug.bat
+

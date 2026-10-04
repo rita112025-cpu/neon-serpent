@@ -115,8 +115,13 @@ export function useSnakeGame() {
         return;
       }
 
-      // Self collision
-      if (currentSnake.some(seg => seg.x === head.x && seg.y === head.y)) {
+      const newSnake = [head, ...currentSnake];
+      const currentFood = foodRef.current;
+
+      // Self collision (exclude tail when it will move away)
+      const willEat = head.x === currentFood.x && head.y === currentFood.y;
+      const bodyToCheck = willEat ? currentSnake : currentSnake.slice(0, -1);
+      if (bodyToCheck.some(seg => seg.x === head.x && seg.y === head.y)) {
         setGameState('gameover');
         const currentScore = scoreRef.current;
         const savedHigh = parseInt(localStorage.getItem('snake-high-score') || '0', 10);
@@ -127,11 +132,8 @@ export function useSnakeGame() {
         return;
       }
 
-      const newSnake = [head, ...currentSnake];
-      const currentFood = foodRef.current;
-
       // Eat food
-      if (head.x === currentFood.x && head.y === currentFood.y) {
+      if (willEat) {
         const newScore = scoreRef.current + 10;
         setScore(newScore);
         setFood(getRandomPosition(newSnake));
