@@ -94,6 +94,10 @@ function App() {
     touchStartRef.current = null;
   };
 
+  const handleTouchCancel = () => {
+    touchStartRef.current = null;
+  };
+
   const difficultyLabels: Record<Difficulty, string> = {
     easy: '簡單',
     medium: '中等',
@@ -111,6 +115,7 @@ function App() {
       className="min-h-full bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col items-center justify-center p-3 md:p-6 select-none"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchCancel}
     >
       {/* Header */}
       <div className="w-full max-w-md mb-3 md:mb-5 animate-slide-up">
@@ -159,7 +164,7 @@ function App() {
       </div>
 
       {/* Game Board */}
-      <div className="w-full max-w-md relative animate-fade-in">
+      <div className="w-full max-w-[min(28rem,46svh)] md:max-w-md relative animate-fade-in touch-none">
         <GameBoard snake={snake} food={food} gridSize={gridSize} />
 
         {/* Overlay States */}
@@ -242,14 +247,14 @@ function App() {
         </div>
 
         {/* Mobile D-Pad */}
-        <div className="md:hidden grid grid-cols-3 gap-1.5 w-36 mt-1">
+        <div className="md:hidden grid grid-cols-3 gap-1.5 w-32 mt-1">
           <div />
           <button
             onTouchStart={(e) => {
               e.stopPropagation();
               if (gameState === 'playing') changeDirection('UP');
             }}
-            className="aspect-square bg-gray-800 active:bg-emerald-600 rounded-xl flex items-center justify-center text-gray-300 text-lg transition-all border border-gray-700/50"
+            className="aspect-square bg-gray-800 active:bg-emerald-600 touch-manipulation rounded-xl flex items-center justify-center text-gray-300 text-lg transition-all border border-gray-700/50"
           >
             ▲
           </button>
@@ -259,7 +264,7 @@ function App() {
               e.stopPropagation();
               if (gameState === 'playing') changeDirection('LEFT');
             }}
-            className="aspect-square bg-gray-800 active:bg-emerald-600 rounded-xl flex items-center justify-center text-gray-300 text-lg transition-all border border-gray-700/50"
+            className="aspect-square bg-gray-800 active:bg-emerald-600 touch-manipulation rounded-xl flex items-center justify-center text-gray-300 text-lg transition-all border border-gray-700/50"
           >
             ◀
           </button>
@@ -271,7 +276,7 @@ function App() {
               e.stopPropagation();
               if (gameState === 'playing') changeDirection('RIGHT');
             }}
-            className="aspect-square bg-gray-800 active:bg-emerald-600 rounded-xl flex items-center justify-center text-gray-300 text-lg transition-all border border-gray-700/50"
+            className="aspect-square bg-gray-800 active:bg-emerald-600 touch-manipulation rounded-xl flex items-center justify-center text-gray-300 text-lg transition-all border border-gray-700/50"
           >
             ▶
           </button>
@@ -281,7 +286,7 @@ function App() {
               e.stopPropagation();
               if (gameState === 'playing') changeDirection('DOWN');
             }}
-            className="aspect-square bg-gray-800 active:bg-emerald-600 rounded-xl flex items-center justify-center text-gray-300 text-lg transition-all border border-gray-700/50"
+            className="aspect-square bg-gray-800 active:bg-emerald-600 touch-manipulation rounded-xl flex items-center justify-center text-gray-300 text-lg transition-all border border-gray-700/50"
           >
             ▼
           </button>
