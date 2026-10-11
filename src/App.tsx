@@ -1,7 +1,8 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { GameBoard } from './components/GameBoard';
 import { useSnakeGame } from './hooks/useSnakeGame';
 import { Direction, Difficulty } from './types';
+import { SoundManager } from './utils/sound';
 
 function App() {
   const {
@@ -19,6 +20,9 @@ function App() {
     changeDirection,
   } = useSnakeGame();
 
+  const [soundEnabled, setSoundEnabled] = useState(() => SoundManager.isEnabled());
+  const [soundVolume, setSoundVolume] = useState(() => SoundManager.getVolume());
+  const [musicEnabled, setMusicEnabled] = useState(() => SoundManager.isMusicEnabled());
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Keyboard controls
@@ -68,6 +72,29 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
+
+  useEffect(() => {
+    SoundManager.setEnabled(soundEnabled);
+  }, [soundEnabled]);
+
+  useEffect(() => {
+    SoundManager.setVolume(soundVolume);
+  }, [soundVolume]);
+
+  useEffect(() => {
+    SoundManager.setMusicEnabled(musicEnabled);
+  }, [musicEnabled]);
+
+  // Unlock audio on first user gesture (browser autoplay policy)
+  useEffect(() => {
+    const unlock = () => SoundManager.unlock();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
 
   // Touch controls - swipe on game board
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -140,26 +167,48 @@ function App() {
           </div>
         </div>
 
-        {/* Difficulty Selector */}
-        <div className="flex gap-1">
-          {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => (
-            <button
-              key={d}
-              onClick={() => {
-                if (gameState !== 'playing') {
-                  setDifficulty(d);
-                }
-              }}
-              disabled={gameState === 'playing'}
-              className={`px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-medium border transition-all duration-200 ${
-                difficulty === d
-                  ? difficultyColors[d] + ' scale-105'
-                  : 'bg-gray-800/50 text-gray-500 border-gray-700/30 hover:text-gray-300 hover:border-gray-600'
-              } disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
-              {difficultyLabels[d]}
-            </button>
-          ))}
+        {/* Difficulty Selector & Sound */}
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => (
+              <button
+                key={d}
+                onClick={() => {
+                  if (gameState !== 'playing') {
+                    setDifficulty(d);
+                  }
+                }}
+                disabled={gameState === 'playing'}
+                className={`px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-medium border transition-all duration-200 ${
+                  difficulty === d
+                    ? difficultyColors[d] + ' scale-105'
+                    : 'bg-gray-800/50 text-gray-500 border-gray-700/30 hover:text-gray-300 hover:border-gray-600'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {difficultyLabels[d]}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => {
+              setSoundEnabled(v => !v);
+              SoundManager.playClick();
+            }}
+            className="px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-medium border bg-gray-800/50 text-gray-300 border-gray-700/30 hover:text-white hover:border-gray-600 transition-all"
+            title="切換音效"
+          >
+            {soundEnabled ? '🔊 音效' : '🔇 靜音'}
+          </button>
+          <button
+            onClick={() => {
+              setMusicEnabled(v => !v);
+              SoundManager.playClick();
+            }}
+            className="px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-medium border bg-gray-800/50 text-gray-300 border-gray-700/30 hover:text-white hover:border-gray-600 transition-all"
+            title="切換背景音樂"
+          >
+            {musicEnabled ? '🎵 音樂' : '🚫 音樂'}
+          </button>
         </div>
       </div>
 
@@ -227,7 +276,7 @@ function App() {
       {/* Controls */}
       <div className="w-full max-w-md mt-3 md:mt-5 flex flex-col items-center gap-2 md:gap-3">
         {/* Action Buttons */}
-        <div className="flex gap-2 md:gap-3">
+        <div className="flex gap-2 md:gap-3 items-center">
           {gameState === 'playing' && (
             <button
               onClick={togglePause}
@@ -244,6 +293,19 @@ function App() {
               🔄 重新開始
             </button>
           )}
+          {/* Volume slider */}
+          <label className="flex items-center gap-1.5 px-2 py-1.5 text-gray-400 text-[10px] md:text-xs" title="音量">
+            🔊
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={soundVolume}
+              onChange={(e) => setSoundVolume(parseFloat(e.target.value))}
+              className="w-20 md:w-24 accent-emerald-500 cursor-pointer"
+            />
+          </label>
         </div>
 
         {/* Mobile D-Pad */}

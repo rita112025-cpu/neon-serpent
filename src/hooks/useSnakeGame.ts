@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Direction, Position, Difficulty, GameState } from '../types';
+import { SoundManager } from '../utils/sound';
 
 const GRID_SIZE = 20;
 const SPEED_MAP: Record<Difficulty, number> = {
@@ -42,6 +43,7 @@ export function useSnakeGame() {
   const snakeRef = useRef<Position[]>(snake);
   const foodRef = useRef<Position>(food);
   const scoreRef = useRef<number>(score);
+  const eatCountRef = useRef<number>(0);
 
   useEffect(() => { directionRef.current = direction; }, [direction]);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
@@ -55,6 +57,9 @@ export function useSnakeGame() {
     setDirection('RIGHT');
     setScore(0);
     setGameState('idle');
+    eatCountRef.current = 0;
+    SoundManager.playClick();
+    SoundManager.stopMusic();
   }, []);
 
   const startGame = useCallback(() => {
@@ -63,15 +68,20 @@ export function useSnakeGame() {
       setFood(getRandomPosition(INITIAL_SNAKE));
       setDirection('RIGHT');
       setScore(0);
+      eatCountRef.current = 0;
     }
+    SoundManager.unlock();
     setGameState('playing');
+    SoundManager.playStart();
   }, [gameState]);
 
   const togglePause = useCallback(() => {
     if (gameState === 'playing') {
       setGameState('paused');
+      SoundManager.playPause();
     } else if (gameState === 'paused') {
       setGameState('playing');
+      SoundManager.playResume();
     }
   }, [gameState]);
 
@@ -83,6 +93,9 @@ export function useSnakeGame() {
       RIGHT: 'LEFT',
     };
     if (opposites[newDir] !== directionRef.current) {
+      if (newDir !== directionRef.current) {
+        SoundManager.playTurn();
+      }
       setDirection(newDir);
     }
   }, []);
@@ -106,11 +119,13 @@ export function useSnakeGame() {
       // Wall collision
       if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
         setGameState('gameover');
+        SoundManager.playDeath();
         const currentScore = scoreRef.current;
         const savedHigh = parseInt(localStorage.getItem('snake-high-score') || '0', 10);
         if (currentScore > savedHigh) {
           localStorage.setItem('snake-high-score', currentScore.toString());
           setHighScore(currentScore);
+          if (currentScore > 0) SoundManager.playNewRecord();
         }
         return;
       }
@@ -123,11 +138,13 @@ export function useSnakeGame() {
       const bodyToCheck = willEat ? currentSnake : currentSnake.slice(0, -1);
       if (bodyToCheck.some(seg => seg.x === head.x && seg.y === head.y)) {
         setGameState('gameover');
+        SoundManager.playDeath();
         const currentScore = scoreRef.current;
         const savedHigh = parseInt(localStorage.getItem('snake-high-score') || '0', 10);
         if (currentScore > savedHigh) {
           localStorage.setItem('snake-high-score', currentScore.toString());
           setHighScore(currentScore);
+          if (currentScore > 0) SoundManager.playNewRecord();
         }
         return;
       }
@@ -137,6 +154,11 @@ export function useSnakeGame() {
         const newScore = scoreRef.current + 10;
         setScore(newScore);
         setFood(getRandomPosition(newSnake));
+        eatCountRef.current += 1;
+        SoundManager.playEat(eatCountRef.current);
+        if (newScore % 100 === 0) {
+          SoundManager.playLevelUp();
+        }
       } else {
         newSnake.pop();
       }
