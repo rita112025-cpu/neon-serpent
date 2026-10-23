@@ -13,6 +13,13 @@ const KEY_DIRECTIONS: Record<string, Direction> = {
   d: 'RIGHT',
 };
 
+const closestMatch = (target: EventTarget | null, selector: string): boolean =>
+  target instanceof Element && target.closest(selector) !== null;
+
+// Focused controls keep their native keyboard behavior (Enter/Space activate, arrows adjust).
+const ACTIVATABLE = 'button, a[href], input, select, textarea, [contenteditable="true"]';
+const ARROW_CONSUMING = 'input, select, textarea, [contenteditable="true"]';
+
 interface KeyboardHandlers {
   onTurn: (dir: Direction) => void;
   onPrimary: () => void;
@@ -26,9 +33,11 @@ export function useKeyboardControls({ onTurn, onPrimary, onPause, onMenu }: Keyb
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       const dir = KEY_DIRECTIONS[key];
       if (dir) {
+        if (closestMatch(e.target, ARROW_CONSUMING)) return;
         e.preventDefault();
         onTurn(dir);
       } else if (key === ' ' || key === 'Enter') {
+        if (closestMatch(e.target, ACTIVATABLE)) return;
         e.preventDefault();
         onPrimary();
       } else if (key === 'Escape' || key === 'p') {
