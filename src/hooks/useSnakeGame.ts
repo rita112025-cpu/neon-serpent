@@ -1,187 +1,229 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Direction, Position, Difficulty, GameState } from '../types';
-import { SoundManager } from '../utils/sound';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Difficulty, Direction, FoodKind, GameEvent, GameState } from '../types';
+import { Sfx } from '../audio/sfx';
+import { DIFFICULTIES } from '../game/config';
+import { LEVELS } from '../game/levels';
+import {
+  createGame,
+  getTickInterval,
+  nextLevel,
+  queueDirection,
+  retryLevel,
+  startPlaying,
+  step,
+  togglePause,
+} from '../game/engine';
+import { readNumber, readString, writeString } from '../utils/storage';
 
-const GRID_SIZE = 20;
-const SPEED_MAP: Record<Difficulty, number> = {
-  easy: 180,
-  medium: 120,
-  hard: 70,
+const STORAGE = {
+  highScore: 'snake-high-score',
+  unlockedLevel: 'neon-serpent-unlocked-level',
+  difficulty: 'neon-serpent-difficulty',
 };
 
-function getRandomPosition(snake: Position[]): Position {
-  let pos: Position;
-  do {
-    pos = {
-      x: Math.floor(Math.random() * GRID_SIZE),
-      y: Math.floor(Math.random() * GRID_SIZE),
-    };
-  } while (snake.some(seg => seg.x === pos.x && seg.y === pos.y));
-  return pos;
+const SPECIAL_SOUNDS: Record<Exclude<FoodKind, 'apple'>, () => void> = {
+  gold: Sfx.gold,
+  ice: Sfx.ice,
+  shrink: Sfx.shrink,
+};
+
+function playEventSound(event: GameEvent) {
+  switch (event.type) {
+    case 'eat':
+      if (event.food === 'apple') Sfx.eat(event.combo);
+      else SPECIAL_SOUNDS[event.food]();
+      break;
+    case 'specialSpawned':
+      Sfx.spawn();
+      break;
+    case 'portal':
+      Sfx.portal();
+      break;
+    case 'crash':
+      Sfx.crash();
+      break;
+    case 'levelComplete':
+      Sfx.levelComplete();
+      break;
+    case 'victory':
+      Sfx.victory();
+      break;
+    case 'specialExpired':
+      break;
+  }
 }
 
-const INITIAL_SNAKE: Position[] = [
-  { x: 10, y: 10 },
-  { x: 9, y: 10 },
-  { x: 8, y: 10 },
-];
+function loadDifficulty(): Difficulty {
+  const saved = readString(STORAGE.difficulty);
+  return saved && saved in DIFFICULTIES ? (saved as Difficulty) : 'medium';
+}
+
+function clampLevel(index: number): number {
+  return Math.min(LEVELS.length - 1, Math.max(0, Math.floor(index)));
+}
 
 export function useSnakeGame() {
-  const [snake, setSnake] = useState<Position[]>(INITIAL_SNAKE);
-  const [food, setFood] = useState<Position>({ x: 15, y: 10 });
-  const [direction, setDirection] = useState<Direction>('RIGHT');
-  const [gameState, setGameState] = useState<GameState>('idle');
-  const [score, setScore] = useState(0);
-  const [highScore, setHighScore] = useState(() => {
-    const saved = localStorage.getItem('snake-high-score');
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
+  const [game, setGame] = useState<GameState>(() => createGame(0, loadDifficulty()));
+  const [highScore, setHighScore] = useState(() => readNumber(STORAGE.highScore, 0));
+  const [unlockedLevel, setUnlockedLevel] = useState(() => clampLevel(readNumber(STORAGE.unlockedLevel, 0)));
 
-  const directionRef = useRef<Direction>(direction);
-  const gameStateRef = useRef<GameState>(gameState);
-  const snakeRef = useRef<Position[]>(snake);
-  const foodRef = useRef<Position>(food);
-  const scoreRef = useRef<number>(score);
-  const eatCountRef = useRef<number>(0);
+  const gameRef = useRef(game);
+  const highScoreRef = useRef(highScore);
+  // High score at the start of the run, used to detect a new record.
+  const runBestRef = useRef(highScore);
 
-  useEffect(() => { directionRef.current = direction; }, [direction]);
-  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
-  useEffect(() => { snakeRef.current = snake; }, [snake]);
-  useEffect(() => { foodRef.current = food; }, [food]);
-  useEffect(() => { scoreRef.current = score; }, [score]);
-
-  const resetGame = useCallback(() => {
-    setSnake(INITIAL_SNAKE);
-    setFood(getRandomPosition(INITIAL_SNAKE));
-    setDirection('RIGHT');
-    setScore(0);
-    setGameState('idle');
-    eatCountRef.current = 0;
-    SoundManager.playClick();
-    SoundManager.stopMusic();
+  const recordScore = useCallback((score: number) => {
+    if (score <= highScoreRef.current) return;
+    highScoreRef.current = score;
+    writeString(STORAGE.highScore, String(score));
+    setHighScore(score);
   }, []);
 
-  const startGame = useCallback(() => {
-    if (gameState === 'gameover' || gameState === 'idle') {
-      setSnake(INITIAL_SNAKE);
-      setFood(getRandomPosition(INITIAL_SNAKE));
-      setDirection('RIGHT');
-      setScore(0);
-      eatCountRef.current = 0;
-    }
-    SoundManager.unlock();
-    setGameState('playing');
-    SoundManager.playStart();
-  }, [gameState]);
+  const unlockLevel = useCallback((index: number) => {
+    setUnlockedLevel(prev => {
+      const next = Math.max(prev, clampLevel(index));
+      if (next !== prev) writeString(STORAGE.unlockedLevel, String(next));
+      return next;
+    });
+  }, []);
 
-  const togglePause = useCallback(() => {
-    if (gameState === 'playing') {
-      setGameState('paused');
-      SoundManager.playPause();
-    } else if (gameState === 'paused') {
-      setGameState('playing');
-      SoundManager.playResume();
-    }
-  }, [gameState]);
+  const commit = useCallback(
+    (next: GameState, events: GameEvent[] = []) => {
+      gameRef.current = next;
+      setGame(next);
+      events.forEach(playEventSound);
 
-  const changeDirection = useCallback((newDir: Direction) => {
-    const opposites: Record<Direction, Direction> = {
-      UP: 'DOWN',
-      DOWN: 'UP',
-      LEFT: 'RIGHT',
-      RIGHT: 'LEFT',
-    };
-    if (opposites[newDir] !== directionRef.current) {
-      if (newDir !== directionRef.current) {
-        SoundManager.playTurn();
+      if (next.status === 'levelComplete') unlockLevel(next.level.index + 1);
+      if (next.status === 'levelComplete' || next.status === 'gameOver' || next.status === 'victory') {
+        recordScore(next.score);
       }
-      setDirection(newDir);
-    }
-  }, []);
+      if ((next.status === 'gameOver' || next.status === 'victory') && next.score > runBestRef.current) {
+        Sfx.newRecord();
+      } else if (next.status === 'gameOver') {
+        Sfx.gameOver();
+      }
+    },
+    [recordScore, unlockLevel],
+  );
 
-  // Game loop
+  const beginRun = useCallback(
+    (state: GameState) => {
+      runBestRef.current = highScoreRef.current;
+      Sfx.start();
+      commit(startPlaying(state));
+    },
+    [commit],
+  );
+
+  // Game loop: one timeout per tick so the speed can change every tick.
   useEffect(() => {
-    if (gameState !== 'playing') return;
+    if (game.status !== 'playing') return;
+    let timer: number;
+    const tick = () => {
+      const { state, events } = step(gameRef.current);
+      commit(state, events);
+      if (state.status === 'playing') timer = window.setTimeout(tick, getTickInterval(state));
+    };
+    timer = window.setTimeout(tick, getTickInterval(gameRef.current));
+    return () => window.clearTimeout(timer);
+  }, [game.status, commit]);
 
-    const interval = setInterval(() => {
-      const currentSnake = [...snakeRef.current];
-      const head = { ...currentSnake[0] };
-      const dir = directionRef.current;
-
-      switch (dir) {
-        case 'UP': head.y -= 1; break;
-        case 'DOWN': head.y += 1; break;
-        case 'LEFT': head.x -= 1; break;
-        case 'RIGHT': head.x += 1; break;
+  // Pause automatically when the tab is hidden or the phone is locked.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden && gameRef.current.status === 'playing') {
+        commit(togglePause(gameRef.current));
       }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [commit]);
 
-      // Wall collision
-      if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
-        setGameState('gameover');
-        SoundManager.playDeath();
-        const currentScore = scoreRef.current;
-        const savedHigh = parseInt(localStorage.getItem('snake-high-score') || '0', 10);
-        if (currentScore > savedHigh) {
-          localStorage.setItem('snake-high-score', currentScore.toString());
-          setHighScore(currentScore);
-          if (currentScore > 0) SoundManager.playNewRecord();
-        }
-        return;
-      }
+  const turn = useCallback(
+    (dir: Direction) => {
+      const { state, accepted } = queueDirection(gameRef.current, dir);
+      if (!accepted) return;
+      Sfx.turn();
+      commit(state);
+    },
+    [commit],
+  );
 
-      const newSnake = [head, ...currentSnake];
-      const currentFood = foodRef.current;
+  /** The main button / Space key: does whatever the current screen offers. */
+  const primaryAction = useCallback(() => {
+    const current = gameRef.current;
+    switch (current.status) {
+      case 'ready':
+        beginRun(current);
+        break;
+      case 'playing':
+        Sfx.pause();
+        commit(togglePause(current));
+        break;
+      case 'paused':
+        Sfx.resume();
+        commit(togglePause(current));
+        break;
+      case 'lifeLost':
+        Sfx.start();
+        commit(retryLevel(current));
+        break;
+      case 'levelComplete':
+        Sfx.start();
+        commit(nextLevel(current));
+        break;
+      case 'gameOver':
+        beginRun(createGame(current.level.index, current.difficulty));
+        break;
+      case 'victory':
+        Sfx.click();
+        commit(createGame(0, current.difficulty));
+        break;
+    }
+  }, [beginRun, commit]);
 
-      // Self collision (exclude tail when it will move away)
-      const willEat = head.x === currentFood.x && head.y === currentFood.y;
-      const bodyToCheck = willEat ? currentSnake : currentSnake.slice(0, -1);
-      if (bodyToCheck.some(seg => seg.x === head.x && seg.y === head.y)) {
-        setGameState('gameover');
-        SoundManager.playDeath();
-        const currentScore = scoreRef.current;
-        const savedHigh = parseInt(localStorage.getItem('snake-high-score') || '0', 10);
-        if (currentScore > savedHigh) {
-          localStorage.setItem('snake-high-score', currentScore.toString());
-          setHighScore(currentScore);
-          if (currentScore > 0) SoundManager.playNewRecord();
-        }
-        return;
-      }
+  const pause = useCallback(() => {
+    const current = gameRef.current;
+    if (current.status === 'playing' || current.status === 'paused') primaryAction();
+  }, [primaryAction]);
 
-      // Eat food
-      if (willEat) {
-        const newScore = scoreRef.current + 10;
-        setScore(newScore);
-        setFood(getRandomPosition(newSnake));
-        eatCountRef.current += 1;
-        SoundManager.playEat(eatCountRef.current);
-        if (newScore % 100 === 0) {
-          SoundManager.playLevelUp();
-        }
-      } else {
-        newSnake.pop();
-      }
+  const goToMenu = useCallback(() => {
+    const current = gameRef.current;
+    Sfx.click();
+    commit(createGame(current.level.index, current.difficulty));
+  }, [commit]);
 
-      setSnake(newSnake);
-    }, SPEED_MAP[difficulty]);
+  const selectLevel = useCallback(
+    (index: number) => {
+      const current = gameRef.current;
+      if (current.status !== 'ready' || index > unlockedLevel) return;
+      Sfx.click();
+      commit(createGame(clampLevel(index), current.difficulty));
+    },
+    [commit, unlockedLevel],
+  );
 
-    return () => clearInterval(interval);
-  }, [gameState, difficulty]);
+  const setDifficulty = useCallback(
+    (difficulty: Difficulty) => {
+      const current = gameRef.current;
+      if (current.status !== 'ready') return;
+      Sfx.click();
+      writeString(STORAGE.difficulty, difficulty);
+      commit(createGame(current.level.index, difficulty));
+    },
+    [commit],
+  );
 
   return {
-    snake,
-    food,
-    direction,
-    gameState,
-    score,
+    game,
     highScore,
-    difficulty,
-    gridSize: GRID_SIZE,
+    unlockedLevel,
+    isNewRecord: game.score > 0 && game.score > runBestRef.current,
+    turn,
+    primaryAction,
+    pause,
+    goToMenu,
+    selectLevel,
     setDifficulty,
-    startGame,
-    togglePause,
-    resetGame,
-    changeDirection,
   };
 }
