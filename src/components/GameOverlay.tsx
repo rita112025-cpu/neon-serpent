@@ -16,7 +16,13 @@ interface GameOverlayProps {
 
 function Shell({ children }: { children: ReactNode }) {
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-1.5 md:gap-2.5 p-3 text-center bg-black/75 backdrop-blur-sm rounded-xl animate-fade-in">
+    <div
+      className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-1.5 md:gap-2.5 p-3 text-center bg-[#05070d]/75 backdrop-blur-md rounded-xl animate-fade-in"
+      style={{
+        boxShadow:
+          'inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent), inset 0 0 50px color-mix(in srgb, var(--accent) 12%, transparent)',
+      }}
+    >
       {children}
     </div>
   );
@@ -26,8 +32,10 @@ function ActionButton({ onClick, children, primary = true }: { onClick: () => vo
   return (
     <button
       onClick={onClick}
-      className={`px-5 md:px-7 py-2 md:py-2.5 font-bold rounded-xl text-white text-sm md:text-base transition-transform hover:scale-105 active:scale-95 ${
-        primary ? 'bg-emerald-500 hover:bg-emerald-400 shadow-lg shadow-emerald-500/30' : 'bg-gray-700 hover:bg-gray-600'
+      className={`px-5 md:px-7 py-2 md:py-2.5 font-bold rounded-xl text-sm md:text-base transition-transform hover:scale-105 active:scale-95 ${
+        primary
+          ? 'text-gray-950 bg-gradient-to-r from-emerald-400 to-cyan-400 hover:brightness-110 shadow-[0_0_18px_rgba(52,211,153,0.55)]'
+          : 'glass text-white hover:bg-white/10'
       }`}
     >
       {children}
@@ -39,7 +47,7 @@ function Title({ icon, text, color = '#ffffff' }: { icon: string; text: string; 
   return (
     <>
       <div className="text-3xl md:text-5xl">{icon}</div>
-      <h2 className="text-lg md:text-2xl font-bold" style={{ color }}>
+      <h2 className="text-lg md:text-2xl font-bold neon-text" style={{ color }}>
         {text}
       </h2>
     </>
@@ -50,7 +58,7 @@ function ReadyScreen({ game, unlockedLevel, onPrimary, onSelectLevel, onSelectDi
   const { level, difficulty } = game;
   return (
     <Shell>
-      <h2 className="text-base md:text-xl font-bold" style={{ color: level.theme.accent }}>
+      <h2 className="text-base md:text-xl font-bold neon-text" style={{ color: level.theme.accent }}>
         第 {level.index + 1} 關 · {level.name}
       </h2>
       <p className="text-gray-300 text-[11px] md:text-sm leading-snug">{level.description}</p>
@@ -67,9 +75,13 @@ function ReadyScreen({ game, unlockedLevel, onPrimary, onSelectLevel, onSelectDi
               onClick={() => onSelectLevel(l.index)}
               title={locked ? '尚未解鎖' : l.name}
               className={`w-9 h-7 md:w-11 md:h-9 rounded-lg text-xs md:text-sm font-bold border transition-colors disabled:cursor-not-allowed ${
-                selected ? 'text-gray-900' : 'bg-gray-800/80 text-gray-300 border-gray-700 hover:border-gray-500'
+                selected ? 'text-gray-950' : 'bg-white/5 text-gray-300 border-white/10 hover:border-white/30'
               } ${locked ? 'opacity-40' : ''}`}
-              style={selected ? { background: l.theme.accent, borderColor: l.theme.accent } : undefined}
+              style={
+                selected
+                  ? { background: l.theme.accent, borderColor: l.theme.accent, boxShadow: `0 0 12px ${l.theme.accent}` }
+                  : undefined
+              }
             >
               {locked ? '🔒' : l.index + 1}
             </button>
@@ -85,7 +97,7 @@ function ReadyScreen({ game, unlockedLevel, onPrimary, onSelectLevel, onSelectDi
             className={`px-2 py-0.5 md:px-3 md:py-1 rounded-lg text-[10px] md:text-xs border transition-colors ${
               d === difficulty
                 ? 'bg-amber-500/20 text-amber-300 border-amber-500/60'
-                : 'bg-gray-800/60 text-gray-400 border-gray-700 hover:text-gray-200'
+                : 'bg-white/5 text-gray-400 border-white/10 hover:text-gray-200'
             }`}
           >
             {DIFFICULTIES[d].label} ❤×{DIFFICULTIES[d].lives}

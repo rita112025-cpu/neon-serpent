@@ -6,7 +6,7 @@ interface AudioToggleProps {
 }
 
 const TOGGLE_CLASS =
-  'px-2 py-1 rounded-lg text-xs border bg-gray-800/50 text-gray-300 border-gray-700/40 hover:text-white hover:border-gray-600 transition-colors';
+  'glass px-2 py-1 rounded-lg text-xs text-gray-300 hover:text-white hover:bg-white/10 transition-colors';
 
 export function AudioToggles({ soundEnabled, musicEnabled, onToggleSound, onToggleMusic }: AudioToggleProps) {
   return (
@@ -37,7 +37,7 @@ export function VolumeSlider({ volume, onChange }: VolumeSliderProps) {
         step={0.05}
         value={volume}
         onChange={e => onChange(parseFloat(e.target.value))}
-        className="w-20 md:w-24 accent-emerald-500 cursor-pointer"
+        className="w-20 md:w-24 accent-[var(--accent)] cursor-pointer"
       />
     </label>
   );
