@@ -23,13 +23,13 @@ export function DPad({ onTurn }: DPadProps) {
             e.stopPropagation();
             onTurn(dir);
           }}
-          className={`${area} aspect-square bg-gray-800 active:bg-emerald-600 touch-manipulation rounded-xl flex items-center justify-center text-gray-300 text-lg border border-gray-700/50`}
+          className={`${area} glass aspect-square touch-manipulation rounded-xl flex items-center justify-center text-gray-300 text-lg transition-[background,box-shadow,color] duration-100 active:text-gray-950 active:bg-[var(--accent)] active:shadow-[0_0_16px_var(--accent)]`}
         >
           {label}
         </button>
       ))}
-      <div className="col-start-2 row-start-2 aspect-square bg-gray-900/80 rounded-xl border border-gray-800 flex items-center justify-center">
-        <div className="w-2.5 h-2.5 rounded-full bg-gray-700" />
+      <div className="col-start-2 row-start-2 aspect-square rounded-xl border border-white/5 bg-black/30 flex items-center justify-center">
+        <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] opacity-60 shadow-[0_0_8px_var(--accent)]" />
       </div>
     </div>
   );

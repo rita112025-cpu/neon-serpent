@@ -62,7 +62,10 @@ function clampLevel(index: number): number {
   return Math.min(LEVELS.length - 1, Math.max(0, Math.floor(index)));
 }
 
-export function useSnakeGame() {
+/** Called after every state change that produced game events (used for visual effects). */
+export type GameEventListener = (events: GameEvent[], state: GameState) => void;
+
+export function useSnakeGame(onEvents?: GameEventListener) {
   const [game, setGame] = useState<GameState>(() => createGame(0, loadDifficulty()));
   const [highScore, setHighScore] = useState(() => readNumber(STORAGE.highScore, 0));
   const [unlockedLevel, setUnlockedLevel] = useState(() => clampLevel(readNumber(STORAGE.unlockedLevel, 0)));
@@ -71,6 +74,8 @@ export function useSnakeGame() {
   const highScoreRef = useRef(highScore);
   // High score at the start of the run, used to detect a new record.
   const runBestRef = useRef(highScore);
+  const onEventsRef = useRef(onEvents);
+  onEventsRef.current = onEvents;
 
   const recordScore = useCallback((score: number) => {
     if (score <= highScoreRef.current) return;
@@ -92,6 +97,7 @@ export function useSnakeGame() {
       gameRef.current = next;
       setGame(next);
       events.forEach(playEventSound);
+      if (events.length > 0) onEventsRef.current?.(events, next);
 
       if (next.status === 'levelComplete') unlockLevel(next.level.index + 1);
       if (next.status === 'levelComplete' || next.status === 'gameOver' || next.status === 'victory') {

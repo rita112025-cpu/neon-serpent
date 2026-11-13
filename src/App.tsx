@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { GameBoard } from './components/GameBoard';
 import { GameOverlay } from './components/GameOverlay';
 import { Hud } from './components/Hud';
@@ -6,13 +7,15 @@ import { AudioToggles, VolumeSlider } from './components/AudioControls';
 import { useSnakeGame } from './hooks/useSnakeGame';
 import { useKeyboardControls, useSwipe } from './hooks/useControls';
 import { useAudioSettings, useBackgroundMusic } from './hooks/useAudio';
+import { useBoardEffects } from './hooks/useBoardEffects';
 
 const SMALL_BUTTON =
-  'px-4 py-2 bg-gray-800 hover:bg-gray-700 active:bg-gray-600 text-gray-300 rounded-lg text-xs md:text-sm font-medium border border-gray-700/50';
+  'glass px-4 py-2 text-gray-200 hover:text-white active:scale-95 transition rounded-lg text-xs md:text-sm font-medium';
 
 function App() {
+  const { effects, shakeKey, handleEvents } = useBoardEffects();
   const { game, highScore, unlockedLevel, isNewRecord, turn, primaryAction, pause, goToMenu, selectLevel, setDifficulty } =
-    useSnakeGame();
+    useSnakeGame(handleEvents);
   const audio = useAudioSettings();
   const swipe = useSwipe(turn);
 
@@ -23,12 +26,29 @@ function App() {
 
   return (
     <div
-      className="min-h-full bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col items-center justify-center p-3 md:p-6 select-none"
+      className="relative isolate min-h-full bg-[#05070d] flex flex-col items-center justify-center p-3 md:p-6 select-none overflow-hidden"
+      style={{ '--accent': game.level.theme.accent } as CSSProperties}
       {...swipe}
     >
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%), radial-gradient(ellipse 60% 40% at 85% 100%, rgba(217,70,239,0.14), transparent 70%), radial-gradient(ellipse 60% 40% at 10% 90%, rgba(34,211,238,0.12), transparent 70%)',
+          }}
+        />
+        <div className="neon-floor absolute left-[-50%] right-[-50%] bottom-0 h-[45%]" />
+      </div>
+
       <header className="w-full max-w-md flex items-center justify-between mb-2 md:mb-4 px-1">
-        <h1 className="text-xl md:text-3xl font-bold bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-400 bg-clip-text text-transparent">
-          🐍 貪吃蛇
+        <h1 className="leading-none">
+          <span className="block text-xl md:text-3xl font-black tracking-wide text-[var(--accent)] neon-text transition-colors duration-500">
+            貪吃蛇
+          </span>
+          <span className="block font-display text-[9px] md:text-[11px] tracking-[0.35em] text-fuchsia-300/80 mt-1">
+            NEON SERPENT
+          </span>
         </h1>
         <AudioToggles
           soundEnabled={audio.soundEnabled}
@@ -41,7 +61,16 @@ function App() {
       <Hud game={game} highScore={highScore} />
 
       <div className="w-full max-w-[min(28rem,44svh)] md:max-w-md relative animate-fade-in touch-none">
-        <GameBoard level={game.level} snake={game.snake} apple={game.apple} special={game.special} movers={game.movers} />
+        <GameBoard
+          level={game.level}
+          snake={game.snake}
+          direction={game.direction}
+          apple={game.apple}
+          special={game.special}
+          movers={game.movers}
+          effects={effects}
+          shakeKey={shakeKey}
+        />
         <GameOverlay
           game={game}
           unlockedLevel={unlockedLevel}
